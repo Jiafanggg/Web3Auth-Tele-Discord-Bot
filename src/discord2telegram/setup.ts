@@ -108,31 +108,8 @@ export function setup(
 
 	// Listen for Discord messages
 	dcBot.on("messageCreate", async message => {
-        const splitMesssage = message.content.split(" ");
-        const msgExcludesBot = !splitMesssage.includes('@Web3Auth_SupportBot');
 		// Ignore the bot's own messages
 		if (message.author.id === dcBot.user?.id) {
-			return;
-		}
-
-		const thread = await message.startThread({
-			name: 'food-talk',
-			autoArchiveDuration: 'MAX',
-		});
-		
-		console.log(`Created thread: ${thread.name}`);
-
-
-		// Check if this is a request for server info
-		if (message.cleanContent === "/chatinfo") {
-			// It is. Give it
-			message
-				.reply("\nchannelId: '" + message.channel.id + "'")
-				.then(sleepOneMinute)
-				.then((info: any) => Promise.all([info.delete(), message.delete()]))
-				.catch(ignoreAlreadyDeletedError);
-
-			// Don't process the message any further
 			return;
 		}
 
@@ -153,10 +130,6 @@ export function setup(
 
 		// Check if the message is from the correct chat
 		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channel.id));
-		logger.log(message.channel);
-		logger.log('this is message channel');
-		logger.log(bridges);
-		logger.log('this is bridges');
 
 		if (!R.isEmpty(bridges)) {
 			bridges.forEach(async bridge => {

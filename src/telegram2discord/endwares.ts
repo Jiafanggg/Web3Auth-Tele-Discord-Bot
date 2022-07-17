@@ -56,9 +56,23 @@ const createMessageHandler = R.curry((func, ctx) => {
  * @param ctx.tediCross.message.chat.id	ID of the chat the message is from
  */
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
+
+	try {
+		ctx.tediCross.message.caption.includes('@Web3Auth_SupportBot');
+	}
+	catch {
+		try {
+			ctx.tediCross.message.text.includes('@Web3Auth_SupportBot');
+		}
+		catch {
+			return;
+		}
+	}
+
 	const allBridges = ctx.TediCross.bridgeMap.bridges;
 	const newChatId = ctx.tediCross.message.chat.id;
 	let newChatIdBoolean = true;
+	let bridgeCount = allBridges.length;
 	const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
 	await ctx.TediCross.dcBot.ready;
 
@@ -92,7 +106,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			crossDeleteOnTelegram: true
 		};
 		const newBridgeSettings = {
-			name: "Third Bridge",
+			name: "Bridge " + (bridgeCount + 1),
 			telegram: newTelegramBridgeSettings,
 			discord: newDiscordBridgeSettings,
 			direction: "both" as const
@@ -106,6 +120,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	}
 	console.log("next");
 	next();
+
 };
 
 /**
@@ -180,22 +195,21 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				const replyToMsg = ctx.tediCross.message.reply_to_message;
 				if (replyToMsg) {
 					if (replyToMsg.text) {
-						messageText = ctx.tediCross.message.reply_to_message.text;
+						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.text;
 					} else if (replyToMsg.document) {
-						messageText = ctx.tediCross.message.reply_to_message.document;
+						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.document;
 					} else if (replyToMsg.photo) {
-						messageText = ctx.tediCross.message.reply_to_message.photo;
+						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.photo;
 					} else if (replyToMsg.sticker) {
-						messageText = ctx.tediCross.message.reply_to_message.sticker;
+						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.sticker;
 					}
 				} else if (ctx.tediCross.message.text.includes("@Web3Auth_SupportBot")) {
-					console.log("text includes web3auth");
-					messageText = ctx.tediCross.message;
+					messageText = prepared.header + "\n" + prepared.text;
 				} else if (
 					ctx.tediCross.message.caption &&
 					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")
 				) {
-					messageText = ctx.tediCross.message;
+					messageText = prepared.header + "\n" + ctx.tediCross.message.photo;
 				} else {
 					return;
 				}

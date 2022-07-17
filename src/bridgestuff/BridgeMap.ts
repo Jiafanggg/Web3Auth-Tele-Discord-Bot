@@ -43,11 +43,11 @@ export class BridgeMap {
 	}
 
 	/**
-	 * Gets a bridge from Discord channel ID
+	 * Gets a bridge from Discord thread ID
 	 *
-	 * @param discordThreadId ID of the Discord channel to get the bridge for
+	 * @param discordThreadId ID of the Discord thread to get the bridge for
 	 *
-	 * @returns The bridges corresponding to the channel ID
+	 * @returns The bridges corresponding to the thread ID
 	 */
 	fromDiscordThreadId(discordThreadId: number) {
 		return R.defaultTo([], this._discordToBridge.get(discordThreadId));
