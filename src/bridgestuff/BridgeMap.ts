@@ -24,9 +24,9 @@ export class BridgeMap {
 
 		// Populate the maps and set
 		bridges.forEach(bridge => {
-			const d = this._discordToBridge.get(Number(bridge.discord.channelId)) || [];
+			const d = this._discordToBridge.get(Number(bridge.discord.threadId)) || [];
 			const t = this._telegramToBridge.get(bridge.telegram.chatId) || [];
-			this._discordToBridge.set(Number(bridge.discord.channelId), [...d, bridge]);
+			this._discordToBridge.set(Number(bridge.discord.threadId), [...d, bridge]);
 			this._telegramToBridge.set(bridge.telegram.chatId, [...t, bridge]);
 		});
 	}
@@ -49,7 +49,7 @@ export class BridgeMap {
 	 *
 	 * @returns The bridges corresponding to the channel ID
 	 */
-	fromDiscordChannelId(discordChannelId: number) {
-		return R.defaultTo([], this._discordToBridge.get(discordChannelId));
+	fromDiscordChannelId(discordThreadId: number) {
+		return R.defaultTo([], this._discordToBridge.get(discordThreadId));
 	}
 }
