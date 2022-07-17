@@ -7,8 +7,8 @@ import { deleteMessage, ignoreAlreadyDeletedError } from "./helpers";
 import { createFromObjFromUser } from "./From";
 import { MessageEditOptions } from "discord.js";
 import { Message, User } from "telegraf/typings/core/types/typegram";
-import { sys } from "typescript";
-import { Logger } from "../Logger";
+import { BridgeMap } from "../bridgestuff/BridgeMap";
+import { Bridge, BridgeProperties } from "../bridgestuff/Bridge";
 
 export interface TediCrossContext extends Context {
 	TediCross: any;
@@ -58,43 +58,34 @@ const createMessageHandler = R.curry((func, ctx) => {
  * @param ctx.tediCross.message.chat	The object of the chat the message is from
  * @param ctx.tediCross.message.chat.id	ID of the chat the message is from
  */
-export const chatinfo = (ctx: TediCrossContext, next: () => void) => {
+export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
-	console.log(ctx.tediCross.message.text);
-	const splitTeleMessage = ctx.tediCross.message.text.split(" ");
-	const teleMessageExcludesBot = !splitTeleMessage.includes('@Web3Auth_SupportBot');
-	// console.log(ctx.tediCross.message)
-	// console.log('the above is the message');
-	console.log(ctx.tediCross.message.chat.title)
-	console.log('the above is the group name');
-	console.log(ctx.tediCross.message.chat.id);
-	console.log('the above is the chat id');
-	console.log(splitTeleMessage);
-	console.log('the above is thes split message');
-	console.log(teleMessageExcludesBot);
-	console.log('the above is whether it does not contains the bot')
+	var allBridges = ctx.TediCross.bridgeMap.bridges;
+	var newChatId = ctx.tediCross.message.chat.id;
+	var newChatIdBoolean = true;
+	const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
+	await ctx.TediCross.dcBot.ready;
 
-	if (teleMessageExcludesBot){
-		return;
+	for (const bridge in allBridges) {
+		if (newChatId == allBridges[bridge].telegram.chatId){
+			newChatIdBoolean = false;
+		}
 	}
 
-	if (ctx.tediCross.message.text === "/chatinfo") {
-		// Reply with the info
-		ctx.reply(`chatID: ${ctx.tediCross.message.chat.id}`)
-			// Wait some time
-			.then(sleepOneMinute)
-			// Delete the info and the command
-			.then(message =>
-				Promise.all([
-					// Delete the info
-					deleteMessage(ctx, message),
-					// Delete the command
-					ctx.deleteMessage()
-				])
-			)
-			.catch(ignoreAlreadyDeletedError);
-	} else {
-		next();
+	if (newChatIdBoolean){
+		var newChatThread = await channel.threads.create({
+			name: ctx.tediCross.message.chat.title,
+			autoArchiveDuration: "MAX",
+		});
+		var newTelegramBridgeSettings = {chatId: newChatId, sendUsernames: true, relayCommands: true, relayJoinMessages: false, relayLeaveMessages: false, crossDeleteOnDiscord: true}
+		var newDiscordBridgeSettings = {channelId: '993373151717228604', threadId: newChatThread.id.toString(), threadName: ctx.tediCross.message.chat.title,  sendUsernames: true, relayJoinMessages: false, relayLeaveMessages: false, crossDeleteOnTelegram: true}
+		var newBridgeSettings = {name: 'Third Bridge', telegram:  newTelegramBridgeSettings, discord: newDiscordBridgeSettings, direction: "both" as const}
+		var newBridge = new Bridge(newBridgeSettings);
+		var discordThreadId = parseInt(newBridge.discord.threadId);
+		allBridges.push(newBridge);
+
+		ctx.TediCross.bridgeMap._discordToBridge.set(discordThreadId, [newBridge]);
+		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 	}
 };
 
@@ -159,6 +150,7 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
  * @param ctx.tediCross	The TediCross context of the message
  * @param ctx.TediCross	The global TediCross context of the message
  */
+
 export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
 		try {
