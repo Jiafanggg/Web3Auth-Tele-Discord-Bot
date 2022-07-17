@@ -304,7 +304,7 @@ export function setup(
 		const isFromTelegram = message.author.id === dcBot.user?.id;
 
 		// Hand it on to the bridges
-		bridgeMap.fromDiscordChannelId(Number(message.channel.id)).forEach(async bridge => {
+		bridgeMap.fromDiscordThreadId(Number(message.channel.id)).forEach(async bridge => {
 			// Ignore it if cross deletion is disabled
 			if (!bridge.discord.crossDeleteOnTelegram) {
 				return;
