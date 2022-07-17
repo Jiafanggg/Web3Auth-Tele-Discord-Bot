@@ -128,8 +128,12 @@ export function setup(
 			)
 		)(message) as string;
 
+		console.log(message.channelId);
+
 		// Check if the message is from the correct chat
-		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channel.id));
+		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channelId));
+		console.log('bridgemap', bridgeMap);
+		console.log('bridge', bridges);
 
 		if (!R.isEmpty(bridges)) {
 			bridges.forEach(async bridge => {

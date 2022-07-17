@@ -112,10 +112,9 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			direction: "both" as const
 		};
 		const newBridge = new Bridge(newBridgeSettings);
-		const discordThreadId = parseInt(newBridge.discord.threadId);
 		allBridges.push(newBridge);
 
-		ctx.TediCross.bridgeMap._discordToBridge.set(discordThreadId, [newBridge]);
+		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThread.id), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 	}
 	console.log("next");
@@ -191,8 +190,11 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
 			console.log("relayMessage");
+			
 			try {
 				const replyToMsg = ctx.tediCross.message.reply_to_message;
+				console.log('reply', replyToMsg);
+
 				if (replyToMsg) {
 					if (replyToMsg.text) {
 						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.text;
@@ -227,16 +229,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, prepared.bridge);
 			let discordThreadId = prepared.bridge.discord.threadId;
 			console.log("prepared.bridge.discord", prepared.bridge.discord);
-
-			console.log("discordThreadId", discordThreadId);
-
-			if (discordThreadId === "") {
-				const thread = await channel.threads.create({
-					name: ctx.tediCross.message.chat.title,
-					autoArchiveDuration: "MAX"
-				});
-				discordThreadId = thread.id.toString();
-			}
 
 			const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
 			console.log("discordThread", discordThread);
