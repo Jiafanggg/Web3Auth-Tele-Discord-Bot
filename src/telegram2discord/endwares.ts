@@ -1,14 +1,11 @@
-import R, { max } from "ramda";
-import { MessageMap } from "../MessageMap";
-import { sleepOneMinute } from "../sleep";
-import { fetchDiscordChannel } from "../fetchDiscordChannel";
-import { Context } from "telegraf";
-import { deleteMessage, ignoreAlreadyDeletedError } from "./helpers";
-import { createFromObjFromUser } from "./From";
 import { MessageEditOptions } from "discord.js";
+import R from "ramda";
+import { Context } from "telegraf";
 import { Message, User } from "telegraf/typings/core/types/typegram";
-import { BridgeMap } from "../bridgestuff/BridgeMap";
-import { Bridge, BridgeProperties } from "../bridgestuff/Bridge";
+import { Bridge } from "../bridgestuff/Bridge";
+import { fetchDiscordChannel } from "../fetchDiscordChannel";
+import { MessageMap } from "../MessageMap";
+import { createFromObjFromUser } from "./From";
 
 export interface TediCrossContext extends Context {
 	TediCross: any;
@@ -59,34 +56,56 @@ const createMessageHandler = R.curry((func, ctx) => {
  * @param ctx.tediCross.message.chat.id	ID of the chat the message is from
  */
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
-
-	var allBridges = ctx.TediCross.bridgeMap.bridges;
-	var newChatId = ctx.tediCross.message.chat.id;
-	var newChatIdBoolean = true;
+	const allBridges = ctx.TediCross.bridgeMap.bridges;
+	const newChatId = ctx.tediCross.message.chat.id;
+	let newChatIdBoolean = true;
 	const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
 	await ctx.TediCross.dcBot.ready;
 
 	for (const bridge in allBridges) {
-		if (newChatId == allBridges[bridge].telegram.chatId){
+		if (newChatId === allBridges[bridge].telegram.chatId) {
 			newChatIdBoolean = false;
 		}
 	}
 
-	if (newChatIdBoolean){
-		var newChatThread = await channel.threads.create({
+	if (newChatIdBoolean) {
+		console.log("newChatIdBoolean");
+		const newChatThread = await channel.threads.create({
 			name: ctx.tediCross.message.chat.title,
-			autoArchiveDuration: "MAX",
+			autoArchiveDuration: "MAX"
 		});
-		var newTelegramBridgeSettings = {chatId: newChatId, sendUsernames: true, relayCommands: true, relayJoinMessages: false, relayLeaveMessages: false, crossDeleteOnDiscord: true}
-		var newDiscordBridgeSettings = {channelId: '993373151717228604', threadId: newChatThread.id.toString(), threadName: ctx.tediCross.message.chat.title,  sendUsernames: true, relayJoinMessages: false, relayLeaveMessages: false, crossDeleteOnTelegram: true}
-		var newBridgeSettings = {name: 'Third Bridge', telegram:  newTelegramBridgeSettings, discord: newDiscordBridgeSettings, direction: "both" as const}
-		var newBridge = new Bridge(newBridgeSettings);
-		var discordThreadId = parseInt(newBridge.discord.threadId);
+		const newTelegramBridgeSettings = {
+			chatId: newChatId,
+			sendUsernames: true,
+			relayCommands: true,
+			relayJoinMessages: false,
+			relayLeaveMessages: false,
+			crossDeleteOnDiscord: true
+		};
+		const newDiscordBridgeSettings = {
+			channelId: "993373151717228604",
+			threadId: newChatThread.id.toString(),
+			threadName: ctx.tediCross.message.chat.title,
+			sendUsernames: true,
+			relayJoinMessages: false,
+			relayLeaveMessages: false,
+			crossDeleteOnTelegram: true
+		};
+		const newBridgeSettings = {
+			name: "Third Bridge",
+			telegram: newTelegramBridgeSettings,
+			discord: newDiscordBridgeSettings,
+			direction: "both" as const
+		};
+		const newBridge = new Bridge(newBridgeSettings);
+		const discordThreadId = parseInt(newBridge.discord.threadId);
 		allBridges.push(newBridge);
 
 		ctx.TediCross.bridgeMap._discordToBridge.set(discordThreadId, [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 	}
+	console.log("next");
+	next();
 };
 
 /**
@@ -155,7 +174,36 @@ export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
 		try {
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
-			const messageText = prepared.header + "\n" + prepared.text;
+			let messageText = prepared.header + "\n" + prepared.text;
+			console.log("relayMessage");
+			try {
+				const replyToMsg = ctx.tediCross.message.reply_to_message;
+				if (replyToMsg) {
+					if (replyToMsg.text) {
+						messageText = ctx.tediCross.message.reply_to_message.text;
+					} else if (replyToMsg.document) {
+						messageText = ctx.tediCross.message.reply_to_message.document;
+					} else if (replyToMsg.photo) {
+						messageText = ctx.tediCross.message.reply_to_message.photo;
+					} else if (replyToMsg.sticker) {
+						messageText = ctx.tediCross.message.reply_to_message.sticker;
+					}
+				} else if (ctx.tediCross.message.text.includes("@Web3Auth_SupportBot")) {
+					console.log("text includes web3auth");
+					messageText = ctx.tediCross.message;
+				} else if (
+					ctx.tediCross.message.caption &&
+					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")
+				) {
+					messageText = ctx.tediCross.message;
+				} else {
+					return;
+				}
+			} catch (error) {
+				console.log("catch hit", error);
+				return;
+			}
+
 			let chunks = R.splitEvery(2000, messageText);
 
 			// Wait for the Discord bot to become ready
@@ -163,37 +211,34 @@ export const relayMessage = (ctx: TediCrossContext) =>
 
 			// Get the channel to send to
 			const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, prepared.bridge);
-			console.log(channel);
-			console.log('the above tries to find the channel');
-			console.log(prepared);
-			console.log('the above tries to find the prepared');
-			console.log(prepared.bridge);
-			console.log('the above tries to find the bridge');
-			let discordThreadName = prepared.bridge.discord.threadName
-			console.log(discordThreadName);
-			console.log('the above tries to find the threadName');
+			let discordThreadId = prepared.bridge.discord.threadId;
+			console.log("prepared.bridge.discord", prepared.bridge.discord);
 
-			if (discordThreadName == ''){
+			console.log("discordThreadId", discordThreadId);
+
+			if (discordThreadId === "") {
 				const thread = await channel.threads.create({
 					name: ctx.tediCross.message.chat.title,
-					autoArchiveDuration: "MAX",
+					autoArchiveDuration: "MAX"
 				});
-				console.log(thread);
-
+				discordThreadId = thread.id.toString();
 			}
 
+			const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
+			console.log("discordThread", discordThread);
 			let dcMessage = null;
 			// Send the attachment first, if there is one
 			if (!R.isNil(prepared.file)) {
 				try {
-					dcMessage = await channel.send({
+					dcMessage = await discordThread?.send({
 						content: R.head(chunks),
 						files: [prepared.file]
 					});
+					console.log(dcMessage);
 					chunks = R.tail(chunks);
 				} catch (err: any) {
 					if (err.message === "Request entity too large") {
-						dcMessage = await channel.send(
+						dcMessage = await discordThread?.send(
 							`***${prepared.senderName}** on Telegram sent a file, but it was too large for Discord. If you want it, ask them to send it some other way*`
 						);
 					} else {
@@ -201,9 +246,10 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					}
 				}
 			}
+
 			// Send the rest in serial
 			dcMessage = await R.reduce(
-				(p, chunk) => p.then(() => channel.send(chunk)),
+				(p, chunk) => p.then(() => discordThread?.send(chunk)),
 				Promise.resolve(dcMessage),
 				chunks
 			);
@@ -306,7 +352,3 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 		await edit(ctx, bridge);
 	}
 });
-function thread(thread: any) {
-	throw new Error("Function not implemented.");
-}
-
