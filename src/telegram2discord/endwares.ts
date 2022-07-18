@@ -55,17 +55,29 @@ const createMessageHandler = R.curry((func, ctx) => {
  * @param ctx.tediCross.message.chat	The object of the chat the message is from
  * @param ctx.tediCross.message.chat.id	ID of the chat the message is from
  */
+
+var fileArray: any[] = [];
+
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
-	try {
-		ctx.tediCross.message.caption.includes('@Web3Auth_SupportBot');
+	// let newThread = true;
+
+	if (!ctx.tediCross.message.text) {
+		// newThread = false;
 	}
-	catch {
+	else {
 		try {
-			ctx.tediCross.message.text.includes('@Web3Auth_SupportBot');
+			ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
 		}
 		catch {
-			return;
+			try {
+				if (!ctx.tediCross.message.text.includes("@Web3Auth_SupportBot")) {
+					return;
+				}
+			}
+			catch {
+				return;
+			}
 		}
 	}
 
@@ -83,7 +95,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	}
 
 	if (newChatIdBoolean) {
-		console.log("newChatIdBoolean");
 		const newChatThread = await channel.threads.create({
 			name: ctx.tediCross.message.chat.title,
 			autoArchiveDuration: "MAX"
@@ -117,7 +128,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThread.id), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 	}
-	console.log("next");
 	next();
 
 };
@@ -189,35 +199,27 @@ export const relayMessage = (ctx: TediCrossContext) =>
 		try {
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
-			console.log("relayMessage");
-			
-			try {
-				const replyToMsg = ctx.tediCross.message.reply_to_message;
-				console.log('reply', replyToMsg);
+			const replyToMsg = ctx.tediCross.message.reply_to_message;
 
-				if (replyToMsg) {
-					if (replyToMsg.text) {
-						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.text;
-					} else if (replyToMsg.document) {
-						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.document;
-					} else if (replyToMsg.photo) {
-						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.photo;
-					} else if (replyToMsg.sticker) {
-						messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.sticker;
-					}
-				} else if (ctx.tediCross.message.text.includes("@Web3Auth_SupportBot")) {
-					messageText = prepared.header + "\n" + prepared.text;
-				} else if (
-					ctx.tediCross.message.caption &&
-					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")
-				) {
-					messageText = prepared.header + "\n" + ctx.tediCross.message.photo;
-				} else {
-					return;
-				}
-			} catch (error) {
-				console.log("catch hit", error);
+			if (!ctx.tediCross.message.text) {
+				let preparedObject = [prepared, ctx.tediCross.message.message_id]
+				fileArray.push(preparedObject);
 				return;
+			}
+
+			console.log(fileArray);
+
+			if (replyToMsg) {
+				if (replyToMsg.text) {
+					messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.text;
+				}
+				else {
+					for (let count = 0; count < fileArray.length; count++) {
+						if (ctx.tediCross.message.reply_to_message.message_id == fileArray[count][1]){
+							prepared.file = fileArray[count][0].file;
+						}
+					}
+				}
 			}
 
 			let chunks = R.splitEvery(2000, messageText);
@@ -228,10 +230,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			// Get the channel to send to
 			const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, prepared.bridge);
 			let discordThreadId = prepared.bridge.discord.threadId;
-			console.log("prepared.bridge.discord", prepared.bridge.discord);
 
 			const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
-			console.log("discordThread", discordThread);
 			let dcMessage = null;
 			// Send the attachment first, if there is one
 			if (!R.isNil(prepared.file)) {
@@ -240,7 +240,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 						content: R.head(chunks),
 						files: [prepared.file]
 					});
-					console.log(dcMessage);
 					chunks = R.tail(chunks);
 				} catch (err: any) {
 					if (err.message === "Request entity too large") {

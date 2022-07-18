@@ -1,22 +1,22 @@
-var mysql = require('mysql');
+const mysql = require("mysql2");
 
-var con = mysql.createConnection({
-    host: "localhost",
-    port: 3306,
-    user: "",
-    password: "root"
-});
-
-con.connect(function (err) {
+const connection = mysql.createConnection({
+    host: "127.0.0.1",
+    user: "root",
+    password: "",
+    database: "TeleDiscordBot",
+  });
+  
+connection.connect(function (err) {
     if (err) throw err;
     console.log("Connected!");
 
-    con.query("CREATE DATABASE TeleDiscordBot", function (err, result) {
-        if (err) throw err;
-        console.log("Database created");
-    });
+connection.query("CREATE DATABASE bridges", function (err, result) {
+    if (err) throw err;
+    console.log("Database created");
+});
 
-    var sql = `CREATE TABLE bridges name VARCHAR(255), 
+var sql = `CREATE TABLE bridgeName VARCHAR(255), 
             chatId VARCHAR(255), sendUsernames BOOLEAN, 
             relayCommands BOOLEAN, relayJoinMessages BOOLEAN,  
             relayLeaveMessages BOOLEAN, crossDeleteOnDiscord BOOLEAN,  
@@ -25,8 +25,8 @@ con.connect(function (err) {
             dcRelayJoinMessages BOOLEAN, dcRelayLeaveMessages BOOLEAN,
             crossDeleteOnTelegram BOOLEAN, direction VARCHAR(255)`;
 
-    con.query(sql, function (err, result) {
-        if (err) throw err;
+connection.query(sql, function (err, result) {
+    if (err) throw err;
         console.log("Table created");
     });
 });
