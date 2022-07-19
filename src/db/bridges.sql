@@ -5,7 +5,7 @@ CREATE DATABASE TeleDiscordBot;
 use TeleDiscordBot;
 
 CREATE TABLE Bridges (
-	bridgeName varchar (255) unique not null,
+	bridgeName varchar (255) unique not null primary key,
     chatId varchar (255) unique not null, 
     sendUsernames boolean not null, 
     relayCommands boolean not null, 
@@ -20,6 +20,5 @@ CREATE TABLE Bridges (
     dcRelayLeaveMessages boolean not null,
     crossDeleteOnTelegram boolean not null, 
     direction varchar (255) not null
-    primary key (bridgeName)
 );
 

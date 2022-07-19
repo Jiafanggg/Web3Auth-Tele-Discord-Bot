@@ -6,6 +6,7 @@ import { Bridge } from "../bridgestuff/Bridge";
 import { fetchDiscordChannel } from "../fetchDiscordChannel";
 import { MessageMap } from "../MessageMap";
 import { createFromObjFromUser } from "./From";
+// import { connection } from "../db/bridge";
 
 export interface TediCrossContext extends Context {
 	TediCross: any;
@@ -127,6 +128,35 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThread.id), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
+
+		const mysql = require("mysql2");
+
+		const connection = mysql.createConnection({
+			host: "127.0.0.1",
+			user: "root",
+			password: "web3authsupport",
+			database: "TeleDiscordBot",
+		});
+
+		connection.connect(function (err: any) {
+			if (err) throw err;
+			console.log("Connected!");
+		});
+
+		var sql = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) unique not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
+		connection.query(sql, function (err: any, result: any) {
+			if (err) throw err;
+			console.log("Table created");
+
+			var sql2 = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
+			var values = [
+				[newBridgeSettings.name, newTelegramBridgeSettings.chatId, newTelegramBridgeSettings.sendUsernames, newTelegramBridgeSettings.relayCommands, newTelegramBridgeSettings.relayJoinMessages, newTelegramBridgeSettings.relayLeaveMessages, newTelegramBridgeSettings.crossDeleteOnDiscord, newDiscordBridgeSettings.channelId, newDiscordBridgeSettings.threadId, newDiscordBridgeSettings.threadName, newDiscordBridgeSettings.sendUsernames, newDiscordBridgeSettings.relayJoinMessages, newDiscordBridgeSettings.relayLeaveMessages, newDiscordBridgeSettings.crossDeleteOnTelegram, newBridgeSettings.direction],
+			];
+			connection.query(sql2, [values], function (err: any, result: any) {
+				if (err) throw err;
+				console.log("1 record inserted");
+			});
+		});
 	}
 	next();
 
@@ -208,6 +238,9 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			}
 
 			console.log(fileArray);
+			console.log(fileArray[0][0].bridge);
+			console.log(fileArray[0][0].file);
+			console.log(fileArray[0][0].text);
 
 			if (replyToMsg) {
 				if (replyToMsg.text) {
@@ -215,7 +248,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 				else {
 					for (let count = 0; count < fileArray.length; count++) {
-						if (ctx.tediCross.message.reply_to_message.message_id == fileArray[count][1]){
+						if (ctx.tediCross.message.reply_to_message.message_id == fileArray[count][1]) {
 							prepared.file = fileArray[count][0].file;
 						}
 					}
