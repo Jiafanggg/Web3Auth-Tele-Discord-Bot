@@ -58,13 +58,14 @@ const createMessageHandler = R.curry((func, ctx) => {
  */
 
 var fileArray: any[] = [];
+let newchatThread = true;
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
-
-	// let newThread = true;
-
+	console.log('its working');
 	if (!ctx.tediCross.message.text) {
-		// newThread = false;
+		console.log('chatinfo');
+		newchatThread = false;
+		console.log('newchatthread', newchatThread);
 	}
 	else {
 		try {
@@ -86,7 +87,8 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	const newChatId = ctx.tediCross.message.chat.id;
 	let newChatIdBoolean = true;
 	let bridgeCount = allBridges.length;
-	const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
+	const dcChannel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
+	
 	await ctx.TediCross.dcBot.ready;
 
 	for (const bridge in allBridges) {
@@ -95,8 +97,10 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		}
 	}
 
-	if (newChatIdBoolean) {
-		const newChatThread = await channel.threads.create({
+	console.log('newchatthread2', newchatThread);
+	console.log('newchatboolean', newChatIdBoolean);
+	if (newChatIdBoolean && newchatThread) {
+		const newChatThread = await dcChannel.threads.create({
 			name: ctx.tediCross.message.chat.title,
 			autoArchiveDuration: "MAX"
 		});
@@ -130,7 +134,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 
 		const mysql = require("mysql2");
-
 		const connection = mysql.createConnection({
 			host: "127.0.0.1",
 			user: "root",
@@ -141,23 +144,24 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		connection.connect(function (err: any) {
 			if (err) throw err;
 			console.log("Connected!");
-		});
-
-		var sql = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) unique not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
-		connection.query(sql, function (err: any, result: any) {
+			});
+		
+		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null, chatId varchar (255) unique not null primary key, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
+		connection.query(createBridgeTable, function (err: any, result: any) {
 			if (err) throw err;
 			console.log("Table created");
 
-			var sql2 = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
-			var values = [
+		var insertBridgeTable = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
+		var values = [
 				[newBridgeSettings.name, newTelegramBridgeSettings.chatId, newTelegramBridgeSettings.sendUsernames, newTelegramBridgeSettings.relayCommands, newTelegramBridgeSettings.relayJoinMessages, newTelegramBridgeSettings.relayLeaveMessages, newTelegramBridgeSettings.crossDeleteOnDiscord, newDiscordBridgeSettings.channelId, newDiscordBridgeSettings.threadId, newDiscordBridgeSettings.threadName, newDiscordBridgeSettings.sendUsernames, newDiscordBridgeSettings.relayJoinMessages, newDiscordBridgeSettings.relayLeaveMessages, newDiscordBridgeSettings.crossDeleteOnTelegram, newBridgeSettings.direction],
 			];
-			connection.query(sql2, [values], function (err: any, result: any) {
+			connection.query(insertBridgeTable, [values], function (err: any, result: any) {
 				if (err) throw err;
 				console.log("1 record inserted");
 			});
 		});
 	}
+	console.log('next');
 	next();
 
 };
@@ -226,21 +230,54 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
 
 export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
+		console.log('next relay message');
 		try {
+			console.log('relaymessage');
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
 			const replyToMsg = ctx.tediCross.message.reply_to_message;
 
+			const mysql = require("mysql2");
+			const connection = mysql.createConnection({
+				host: "127.0.0.1",
+				user: "root",
+				password: "web3authsupport",
+				database: "TeleDiscordBot",
+			});
+
+			connection.connect(function (err: any) {
+				if (err) throw err;
+				console.log("Connected!");
+			});
+
 			if (!ctx.tediCross.message.text) {
 				let preparedObject = [prepared, ctx.tediCross.message.message_id]
+
+				var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
+				connection.query(createMessageTable, function (err: any, result: any) {
+					if (err) throw err;
+					console.log("Message Table created");
+				});
+
+				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
+				console.log('prepared message attachment', prepared.file.attachment);
+
+				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
+				connection.query(insertMessageTable, [values], function (err: any, result: any) {
+					if (err) throw err;
+						console.log("1 record inserted");
+				});
+				
 				fileArray.push(preparedObject);
 				return;
-			}
+			};
 
 			console.log(fileArray);
 			console.log(fileArray[0][0].bridge);
 			console.log(fileArray[0][0].file);
 			console.log(fileArray[0][0].text);
+
+			// var selectMessageTable = 
 
 			if (replyToMsg) {
 				if (replyToMsg.text) {
@@ -248,6 +285,11 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 				else {
 					for (let count = 0; count < fileArray.length; count++) {
+						// connection.query(`SELECT * FROM Messages where message = ${ctx.tediCross.message.reply_to_message.message_id}`, function (err: any, result: any, fields: any) {
+						// 	if (err) throw err;
+						// 	console.log(result);
+						// });
+			
 						if (ctx.tediCross.message.reply_to_message.message_id == fileArray[count][1]) {
 							prepared.file = fileArray[count][0].file;
 						}

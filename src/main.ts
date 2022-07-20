@@ -98,7 +98,55 @@ const dcBot = new DiscordClient({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.
 // Create a message ID map
 const messageMap = new MessageMap();
 
+
 // Create the bridge map
+
+const mysql = require("mysql2");
+
+const connection = mysql.createConnection({
+    host: "127.0.0.1",
+    user: "root",
+    password: "web3authsupport",
+    database: "TeleDiscordBot",
+});
+
+connection.connect(function (err: any) {
+    if (err) throw err;
+    console.log("Connected!");
+});
+
+var sql = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) unique not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
+        connection.query(sql, function (err: any, result: any) {
+            if (err) throw err;
+            console.log("Table created");
+});
+
+// connection.connect(function(err: any) {
+//     if (err) throw err;
+//     connection.query("SELECT * FROM bridges", function (err: any, result: String | any, fields: any) {
+//         if (err) throw err;
+// 		const bridgeMap = new BridgeMap(result);
+// 		console.log(bridgeMap);
+//     });
+// });
+
+// connection.connect(function(err: any) {
+//     if (err) throw err;
+//     connection.query("SELECT * FROM bridges", function (err: any, result: string | any[], fields: any) {
+//         if (err) throw err;
+//           for (let set = 0; set < result.length; set++) {
+//             let data = result[set]
+// 			// const bridgeMap = new BridgeMap(result.map((bridgeSettings: BridgeProperties) => new Bridge(bridgeSettings)));
+//             for(const key in data) {
+//                 console.log(key);
+//                 if(data.hasOwnProperty(key)) {
+//                     var value = data[key];
+//                     console.log(value)
+//                 }
+//             }
+//     }});
+// });
+
 const bridgeMap = new BridgeMap(settings.bridges.map((bridgeSettings: BridgeProperties) => new Bridge(bridgeSettings)));
 
 /*********************

@@ -132,8 +132,6 @@ export function setup(
 
 		// Check if the message is from the correct chat
 		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channelId));
-		console.log('bridgemap', bridgeMap);
-		console.log('bridge', bridges);
 
 		if (!R.isEmpty(bridges)) {
 			bridges.forEach(async bridge => {
@@ -221,18 +219,17 @@ export function setup(
 			// The message is from the wrong chat. Inform the sender that this is a private bot, if they have not been informed the last minute
 			if (!antiInfoSpamSet.has(message.channel.id)) {
 				antiInfoSpamSet.add(message.channel.id);
-
-				message
-					.reply(
-						"This is an instance of a TediCross bot, bridging a chat in Telegram with one in Discord. " +
-							"If you wish to use TediCross yourself, please download and create an instance. " +
-							"See https://github.com/TediCross/TediCross"
-					)
-					// Delete it again after some time
-					.then(sleepOneMinute)
-					.then((message: any) => message.delete())
-					.catch(ignoreAlreadyDeletedError)
-					.then(() => antiInfoSpamSet.delete(message.channel.id));
+				// message
+				// 	.reply(
+				// 		"This is an instance of a TediCross bot, bridging a chat in Telegram with one in Discord. " +
+				// 			"If you wish to use TediCross yourself, please download and create an instance. " +
+				// 			"See https://github.com/TediCross/TediCross"
+				// 	)
+				// 	// Delete it again after some time
+				// 	.then(sleepOneMinute)
+				// 	.then((message: any) => message.delete())
+				// 	.catch(ignoreAlreadyDeletedError)
+				// 	.then(() => antiInfoSpamSet.delete(message.channel.id));
 			}
 		}
 	});

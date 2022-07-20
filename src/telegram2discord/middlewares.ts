@@ -270,25 +270,24 @@ function informThisIsPrivateBot(ctx: TediCrossContext, next: () => void) {
 			// Inform the chat this is an instance of TediCross
 			ctx => {
 				// Update the anti spam set
-				ctx.TediCross.antiInfoSpamSet.add(ctx.tediCross.message.chat.id);
-
+				// ctx.TediCross.antiInfoSpamSet.add(ctx.tediCross.message.chat.id);
 				// Send the reply
-				ctx.reply(
-					"This is an instance of a [TediCross](https://github.com/TediCross/TediCross) bot, " +
-						"bridging a chat in Telegram with one in Discord. " +
-						"If you wish to use TediCross yourself, please download and create an instance.",
-					{
-						parse_mode: "Markdown"
-					}
-				).then(msg =>
-					// Delete it again after a while
-					//@ts-ignore
-					sleepOneMinute()
-						.then(() => deleteMessage(ctx, msg))
-						.catch(ignoreAlreadyDeletedError)
-						// Remove it from the anti spam set again
-						.then(() => ctx.TediCross.antiInfoSpamSet.delete(ctx.message!.chat.id))
-				);
+				// ctx.reply(
+				// 	"This is an instance of a [TediCross](https://github.com/TediCross/TediCross) bot, " +
+				// 		"bridging a chat in Telegram with one in Discord. " +
+				// 		"If you wish to use TediCross yourself, please download and create an instance.",
+				// 	{
+				// 		parse_mode: "Markdown"
+				// 	}
+				// ).then(msg =>
+				// 	// Delete it again after a while
+				// 	//@ts-ignore
+				// 	sleepOneMinute()
+				// 		.then(() => deleteMessage(ctx, msg))
+				// 		.catch(ignoreAlreadyDeletedError)
+				// 		// Remove it from the anti spam set again
+				// 		.then(() => ctx.TediCross.antiInfoSpamSet.delete(ctx.message!.chat.id))
+				// );
 			}
 		),
 		// Otherwise go to next middleware
