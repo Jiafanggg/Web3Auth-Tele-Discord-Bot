@@ -1,25 +1,27 @@
 const mysql = require("mysql2");
 
-const connection = mysql.createConnection({
+var connection = mysql.createConnection({
     host: "127.0.0.1",
     user: "root",
     password: "web3authsupport",
     database: "TeleDiscordBot",
 });
 
-connection.connect(function (err) {
-    if (err) throw err;
-    console.log("Connected!");
-});
+module.exports = {connection: connection} ;
 
-connection.connect(function(err) {
-    if (err) throw err;
-    var sql = "DROP TABLE Bridges";
-    connection.query(sql, function (err, result) {
-      if (err) throw err;
-      console.log("Table deleted");
-    });
-  });
+// connection.connect(function (err) {
+//     if (err) throw err;
+//     console.log("Connected!");
+// });
+
+// connection.connect(function(err) {
+//     if (err) throw err;
+//     var sql = "DROP TABLE Bridges";
+//     connection.query(sql, function (err, result) {
+//       if (err) throw err;
+//       console.log("Table deleted");
+//     });
+//   });
 
 // var sql = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) unique not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
 // connection.query(sql, function (err, result) {

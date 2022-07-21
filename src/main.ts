@@ -112,46 +112,70 @@ const connection = mysql.createConnection({
 
 connection.connect(function (err: any) {
     if (err) throw err;
-    console.log("Connected!");
 });
 
 var sql = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) unique not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
         connection.query(sql, function (err: any, result: any) {
             if (err) throw err;
-            console.log("Table created");
 });
 
-// connection.connect(function(err: any) {
-//     if (err) throw err;
-//     connection.query("SELECT * FROM bridges", function (err: any, result: String | any, fields: any) {
-//         if (err) throw err;
-// 		const bridgeMap = new BridgeMap(result);
-// 		console.log(bridgeMap);
-//     });
-// });
+function checkTrueFalse (input: number){
+	if (input === 0){
+		return false;
+	}
+	else {
+		return true;
+	}
+}
 
-// connection.connect(function(err: any) {
-//     if (err) throw err;
-//     connection.query("SELECT * FROM bridges", function (err: any, result: string | any[], fields: any) {
-//         if (err) throw err;
-//           for (let set = 0; set < result.length; set++) {
-//             let data = result[set]
-// 			// const bridgeMap = new BridgeMap(result.map((bridgeSettings: BridgeProperties) => new Bridge(bridgeSettings)));
-//             for(const key in data) {
-//                 console.log(key);
-//                 if(data.hasOwnProperty(key)) {
-//                     var value = data[key];
-//                     console.log(value)
-//                 }
-//             }
-//     }});
-// });
+var bridgeArray: { name: any; direction: any; telegram: { chatId: any; relayJoinMessages: boolean; relayLeaveMessages: boolean; sendUsernames: boolean; relayCommands: boolean; crossDeleteOnDiscord: boolean; }; discord: { channelId: any; threadId: any; threadName: any; relayJoinMessages: boolean; relayLeaveMessages: boolean; sendUsernames: boolean; crossDeleteOnTelegram: boolean; }; }[] = []
 
-const bridgeMap = new BridgeMap(settings.bridges.map((bridgeSettings: BridgeProperties) => new Bridge(bridgeSettings)));
+const getBridges = async function(error: any, result: any){
+	for (let set = 0; set < result.length; set++) {
+        let data = result[set]
 
-/*********************
- * Set up the bridge *
- *********************/
+		const newTelegramSettings  = {
+			chatId: data.chatId, 
+			relayJoinMessages: checkTrueFalse (data.relayJoinMessages), 
+			relayLeaveMessages: checkTrueFalse (data.relayLeaveMessages), 
+			sendUsernames: checkTrueFalse (data.sendUsernames), 
+			relayCommands: checkTrueFalse (data.relayCommands), 
+			crossDeleteOnDiscord: checkTrueFalse (data.crossDeleteOnDiscord)
+		};
 
-discordSetup(logger, dcBot, tgBot, messageMap, bridgeMap, settings, args.dataDir);
-telegramSetup(logger, tgBot as TediTelegraf, dcBot, messageMap, bridgeMap, settings);
+		const newDiscordSettings  = {
+			channelId: data.channelId, 
+			threadId: data.threadId, 
+			threadName: data.threadName, 
+			relayJoinMessages: checkTrueFalse (data.dcRelayJoinMessages), 
+			relayLeaveMessages: checkTrueFalse (data.dcRelayLeaveMessages),  
+			sendUsernames: checkTrueFalse (data.dcSendUsernames), 
+			crossDeleteOnTelegram: checkTrueFalse (data.crossDeleteOnTelegram)
+		};
+
+		const newBridge = {
+			name: data.bridgeName,
+			direction: data.direction,
+			telegram: newTelegramSettings,
+			discord: newDiscordSettings
+		};
+
+		bridgeArray.push(newBridge);
+	}
+	return bridgeArray;
+};
+
+const returnBridges = async function (){
+	connection.query("SELECT * FROM bridges", function (err: any, result: string | any[], fields: any) {
+	if (err) throw err;
+	const promise = Promise.resolve(getBridges(err, result));
+
+	promise.then((value) => {
+		const bridgeMap = new BridgeMap(value.map((bridgeSettings: BridgeProperties) => new Bridge(bridgeSettings)));
+		discordSetup(logger, dcBot, tgBot, messageMap, bridgeMap, settings, args.dataDir);
+		telegramSetup(logger, tgBot as TediTelegraf, dcBot, messageMap, bridgeMap, settings);
+	});
+});
+} 
+
+returnBridges();
