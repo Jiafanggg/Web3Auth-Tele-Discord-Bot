@@ -59,7 +59,10 @@ const createMessageHandler = R.curry((func, ctx) => {
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
+	let newThread = true;
+
 	if (!ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined) {
+		newThread = false;
 	}
 	else {
 		try {
@@ -81,6 +84,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	const newChatId = ctx.tediCross.message.chat.id;
 	let newChatIdBoolean = true;
 	let bridgeCount = allBridges.length;
+	let newChatThreadId = '';
 	const dcChannel = await fetchDiscordChannel(ctx.TediCross.dcBot, ctx.TediCross.bridgeMap.bridges[0]);
 
 	await ctx.TediCross.dcBot.ready;
@@ -89,13 +93,38 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		if (newChatId === allBridges[bridge].telegram.chatId) {
 			newChatIdBoolean = false;
 		}
+
+		if (allBridges[bridge].discord.threadId === '1' && newChatIdBoolean === false && newThread){
+			console.log('create new thread2');
+			let newChatThread = await dcChannel.threads.create({
+				name: ctx.tediCross.message.chat.title,
+				autoArchiveDuration: 10080
+			});
+
+			var updateBridgeTable = `UPDATE Bridges SET threadId = ${newChatThread.id.toString()} WHERE threadId = "1" AND bridgeName = '${allBridges[bridge].name}'`;
+			connection.query(updateBridgeTable, function (err: any, result: any) {
+				if (err) throw err;
+				console.log("1 record updated");
+			});
+
+			allBridges[bridge].discord.threadId = newChatThread.id.toString();
+		}
 	}
 
 	if (newChatIdBoolean) {
-		const newChatThread = await dcChannel.threads.create({
-			name: ctx.tediCross.message.chat.title,
-			autoArchiveDuration: 10080
-		});
+		console.log('create new thread1');
+		if (newThread){
+			let newChatThread = await dcChannel.threads.create({
+				name: ctx.tediCross.message.chat.title,
+				autoArchiveDuration: 10080
+			});
+			newChatThreadId = newChatThread.id.toString();
+			console.log('create new thread');
+		}
+		else {
+			newChatThreadId = '1';
+		}
+
 		const newTelegramBridgeSettings = {
 			chatId: newChatId,
 			sendUsernames: true,
@@ -106,7 +135,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		};
 		const newDiscordBridgeSettings = {
 			channelId: "993373151717228604",
-			threadId: newChatThread.id.toString(),
+			threadId: newChatThreadId,
 			threadName: ctx.tediCross.message.chat.title,
 			sendUsernames: true,
 			relayJoinMessages: false,
@@ -119,17 +148,18 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			discord: newDiscordBridgeSettings,
 			direction: "both" as const
 		};
+
 		const newBridge = new Bridge(newBridgeSettings);
 		allBridges.push(newBridge);
 
-		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThread.id), [newBridge]);
+		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThreadId), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 
 		connection.connect(function (err: any) {
 			if (err) throw err;
 		});
 
-		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
+		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
 		connection.query(createBridgeTable, function (err: any, result: any) {
 			if (err) throw err;
 			console.log("Table created");
@@ -214,6 +244,7 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
 export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
 		try {
+			console.log('relay message');
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
 			let file = prepared.file;
@@ -222,6 +253,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			connection.connect(function (err: any) {
 				if (err) throw err;
 			});
+
+			console.log('prepared', prepared);
 
 			const dealWithData = async function (file?: any) {
 				let chunks = R.splitEvery(2000, messageText);
@@ -232,8 +265,11 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				// Get the channel to send to
 				const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, prepared.bridge);
 				let discordThreadId = prepared.bridge.discord.threadId;
+				console.log('dctid', discordThreadId);
 
 				const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
+				console.log(discordThread);
+
 				let dcMessage = null;
 				// Send the attachment first, if there is one
 				if (!R.isNil(file)) {
@@ -285,7 +321,15 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log("1 record inserted");
 				});
 
-				return;
+				try {
+					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
+					console.log('caption');
+				}
+				catch (err) {
+					console.log('no caption');
+					return;
+				}
+
 			};
 
 			if (replyToMsg) {
@@ -306,6 +350,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 			}
 			else {
+				console.log('no caption2');
 				dealWithData(file);
 			}
 
