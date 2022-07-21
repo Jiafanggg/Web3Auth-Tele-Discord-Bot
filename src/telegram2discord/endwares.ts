@@ -222,24 +222,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				if (err) throw err;
 			});
 
-			if (!ctx.tediCross.message.text && replyToMsg === undefined) {
-				var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
-				connection.query(createMessageTable, function (err: any, result: any) {
-					if (err) throw err;
-					console.log("Message Table created");
-				});
-
-				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-
-				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
-				connection.query(insertMessageTable, [values], function (err: any, result: any) {
-					if (err) throw err;
-					console.log("1 record inserted");
-				});
-
-				return;
-			};
-
 			const dealWithData = async function(file?: any) {
 				let chunks = R.splitEvery(2000, messageText);
 
@@ -286,6 +268,28 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					dcMessage?.id
 				);
 			}
+
+			if (!ctx.tediCross.message.text && replyToMsg === undefined) {
+
+				if (ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
+					dealWithData(file);
+				}
+
+				else {
+					var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
+					connection.query(createMessageTable, function (err: any, result: any) {
+						if (err) throw err;
+					});
+	
+					var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
+	
+					var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
+					connection.query(insertMessageTable, [values], function (err: any, result: any) {
+						if (err) throw err;
+					});
+					return;
+				}
+			};
 
 			if (replyToMsg) {
 				if (replyToMsg.text) {
