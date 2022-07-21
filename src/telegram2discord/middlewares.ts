@@ -174,8 +174,12 @@ function addMessageObj(ctx: TediCrossContext, next: () => void) {
  * @param next Function to pass control to next middleware
  */
 function addMessageId(ctx: TediCrossContext, next: () => void) {
-	ctx.tediCross.messageId = ctx.tediCross.message.message_id;
-
+	try {
+		ctx.tediCross.messageId = ctx.tediCross.message.message_id;
+	}
+	catch {
+		return;
+	}
 	next();
 }
 

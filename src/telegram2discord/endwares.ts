@@ -58,7 +58,8 @@ const createMessageHandler = R.curry((func, ctx) => {
  */
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
-	if (!ctx.tediCross.message.text) {
+
+	if (!ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined) {
 	}
 	else {
 		try {
@@ -135,12 +136,12 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 			var insertBridgeTable = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
 			var values = [
-					[newBridgeSettings.name, newTelegramBridgeSettings.chatId, newTelegramBridgeSettings.sendUsernames, newTelegramBridgeSettings.relayCommands, newTelegramBridgeSettings.relayJoinMessages, newTelegramBridgeSettings.relayLeaveMessages, newTelegramBridgeSettings.crossDeleteOnDiscord, newDiscordBridgeSettings.channelId, newDiscordBridgeSettings.threadId, newDiscordBridgeSettings.threadName, newDiscordBridgeSettings.sendUsernames, newDiscordBridgeSettings.relayJoinMessages, newDiscordBridgeSettings.relayLeaveMessages, newDiscordBridgeSettings.crossDeleteOnTelegram, newBridgeSettings.direction],
-				];
-				connection.query(insertBridgeTable, [values], function (err: any, result: any) {
-					if (err) throw err;
-					console.log("1 record inserted");
-				});
+				[newBridgeSettings.name, newTelegramBridgeSettings.chatId, newTelegramBridgeSettings.sendUsernames, newTelegramBridgeSettings.relayCommands, newTelegramBridgeSettings.relayJoinMessages, newTelegramBridgeSettings.relayLeaveMessages, newTelegramBridgeSettings.crossDeleteOnDiscord, newDiscordBridgeSettings.channelId, newDiscordBridgeSettings.threadId, newDiscordBridgeSettings.threadName, newDiscordBridgeSettings.sendUsernames, newDiscordBridgeSettings.relayJoinMessages, newDiscordBridgeSettings.relayLeaveMessages, newDiscordBridgeSettings.crossDeleteOnTelegram, newBridgeSettings.direction],
+			];
+			connection.query(insertBridgeTable, [values], function (err: any, result: any) {
+				if (err) throw err;
+				console.log("1 record inserted");
+			});
 		});
 	}
 
@@ -222,7 +223,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				if (err) throw err;
 			});
 
-			const dealWithData = async function(file?: any) {
+			const dealWithData = async function (file?: any) {
 				let chunks = R.splitEvery(2000, messageText);
 
 				// Wait for the Discord bot to become ready
@@ -270,25 +271,21 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			}
 
 			if (!ctx.tediCross.message.text && replyToMsg === undefined) {
+				var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
+				connection.query(createMessageTable, function (err: any, result: any) {
+					if (err) throw err;
+					console.log("Message Table created");
+				});
 
-				if (ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
-					dealWithData(file);
-				}
+				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
 
-				else {
-					var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
-					connection.query(createMessageTable, function (err: any, result: any) {
-						if (err) throw err;
-					});
-	
-					var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-	
-					var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
-					connection.query(insertMessageTable, [values], function (err: any, result: any) {
-						if (err) throw err;
-					});
-					return;
-				}
+				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
+				connection.query(insertMessageTable, [values], function (err: any, result: any) {
+					if (err) throw err;
+					console.log("1 record inserted");
+				});
+
+				return;
 			};
 
 			if (replyToMsg) {
@@ -297,15 +294,15 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					dealWithData();
 				}
 				else {
-					const dealWithDBData = async function(error: any, data: any) {
+					const dealWithDBData = async function (error: any, data: any) {
 						file = new MessageAttachment(data[0].attachment, data[0].attachmentName);
 						return file;
-					};	
-					
-					connection.query(`SELECT * FROM Messages where messageId = ${ctx.tediCross.message.reply_to_message.message_id}`, 
-					function (error: any, data: any, fields: any) {
-						Promise.resolve(dealWithDBData(error, data)).then((value) => dealWithData(value));
-					})
+					};
+
+					connection.query(`SELECT * FROM Messages where messageId = ${ctx.tediCross.message.reply_to_message.message_id}`,
+						function (error: any, data: any, fields: any) {
+							Promise.resolve(dealWithDBData(error, data)).then((value) => dealWithData(value));
+						})
 				}
 			}
 			else {
@@ -343,11 +340,11 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 			const tp = ctx.deleteMessage();
 
 			await Promise.all([dp, tp]);
-			} catch (err: any) {
-				console.error(
-					`Could not cross-delete message from Telegram to Discord on bridge ${bridge.name}: ${err.message}`
-				);
-			}
+		} catch (err: any) {
+			console.error(
+				`Could not cross-delete message from Telegram to Discord on bridge ${bridge.name}: ${err.message}`
+			);
+		}
 	};
 
 	// Function to edit a message on Discord
