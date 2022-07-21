@@ -94,7 +94,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	if (newChatIdBoolean) {
 		const newChatThread = await dcChannel.threads.create({
 			name: ctx.tediCross.message.chat.title,
-			autoArchiveDuration: "MAX"
+			autoArchiveDuration: 10080
 		});
 		const newTelegramBridgeSettings = {
 			chatId: newChatId,
@@ -285,9 +285,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log("1 record inserted");
 				});
 
-				if (!ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
-					return;
-				}
+				return;
 			};
 
 			if (replyToMsg) {
