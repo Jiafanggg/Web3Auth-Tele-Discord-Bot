@@ -285,10 +285,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log("1 record inserted");
 				});
 
-				try {
-					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
-				}
-				catch (err) {
+				if (!ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
 					return;
 				}
 			};
@@ -371,12 +368,6 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 
 			// Wait for the Discord bot to become ready
 			await ctx.TediCross.dcBot.ready;
-
-			// const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, bridge);
-
-			// console.log((await fetchDiscordChannel(ctx.TediCross.dcBot, bridge)).messages);
-
-			// const channel = client.channels.cache.get("Your channel ID");
 
 			// Get the messages from Discord
 			const dcMessage = await fetchDiscordChannel(ctx.TediCross.dcBot, bridge).then(
