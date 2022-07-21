@@ -1,17 +1,12 @@
 import { MessageAttachment, MessageEditOptions, Snowflake } from "discord.js";
 import R from "ramda";
 import { Context } from "telegraf";
-import client from "telegraf/typings/core/network/client";
 import { Message, User } from "telegraf/typings/core/types/typegram";
 import { Bridge } from "../bridgestuff/Bridge";
 import { fetchDiscordChannel } from "../fetchDiscordChannel";
 import { MessageMap } from "../MessageMap";
 import { createFromObjFromUser } from "./From";
-// import { connection } from "../db/bridge";
-
-// var config = require('../db/config.js');
-// const mysql = require("mysql2");
-// var connection = mysql.createConnection(config.connection);
+const { connection } = require('../db/config.js');
 
 export interface TediCrossContext extends Context {
 	TediCross: any;
@@ -61,11 +56,6 @@ const createMessageHandler = R.curry((func, ctx) => {
  * @param ctx.tediCross.message.chat	The object of the chat the message is from
  * @param ctx.tediCross.message.chat.id	ID of the chat the message is from
  */
-
-let newchatThread = true;
-
-// export const savePrepared = (ctx: TediCrossContext) =>
-// 	R.forEach(async (prepared: any) => {}
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	if (!ctx.tediCross.message.text) {
@@ -134,17 +124,8 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThread.id), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 
-		const mysql = require("mysql2");
-		const connection = mysql.createConnection({
-			host: "127.0.0.1",
-			user: "root",
-			password: "web3authsupport",
-			database: "TeleDiscordBot",
-		});
-
 		connection.connect(function (err: any) {
 			if (err) throw err;
-			console.log("Connected!");
 		});
 
 		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) unique not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
@@ -221,48 +202,6 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
 		);
 });
 
-// export const savePrepared = (ctx: TediCrossContext) =>
-// R.forEach(async (prepared: any) => {
-// 	try {
-// 		console.log('yay it is working');
-// 		const mysql = require("mysql2");
-// 		const connection = mysql.createConnection({
-// 			host: "127.0.0.1",
-// 			user: "root",
-// 			password: "web3authsupport",
-// 			database: "TeleDiscordBot",
-// 		});
-
-// 		connection.connect(function (err: any) {
-// 			if (err) throw err;
-// 			console.log("Connected!");
-// 		});
-
-// 		if (!ctx.tediCross.message.text) {
-
-// 			var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
-// 			connection.query(createMessageTable, function (err: any, result: any) {
-// 				if (err) throw err;
-// 				console.log("Message Table created");
-// 			});
-
-// 			var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-
-// 			var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
-// 			connection.query(insertMessageTable, [values], function (err: any, result: any) {
-// 				if (err) throw err;
-// 				console.log("1 record inserted");
-// 			});
-
-// 			return;
-// 		};
-
-// 	}
-// 	catch (err: any) {
-// 		console.error(`Could not relay a message to Discord on bridge ${prepared.bridge.name}: ${err.message}`);
-// 	}
-// });
-
 /**
  * Relays a message from Telegram to Discord
  *
@@ -278,14 +217,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			let messageText = prepared.header + "\n" + prepared.text;
 			let file = prepared.file;
 			const replyToMsg = ctx.tediCross.message.reply_to_message;
-
-			const mysql = require("mysql2");
-			const connection = mysql.createConnection({
-				host: "127.0.0.1",
-				user: "root",
-				password: "web3authsupport",
-				database: "TeleDiscordBot",
-			});
 
 			connection.connect(function (err: any) {
 				if (err) throw err;
@@ -398,8 +329,6 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 				ctx.tediCross.message.message_id
 			);
 
-			console.log('hello');
-
 			// Get the channel to delete on
 			const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, bridge);
 
@@ -410,11 +339,11 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 			const tp = ctx.deleteMessage();
 
 			await Promise.all([dp, tp]);
-		} catch (err: any) {
-			console.error(
-				`Could not cross-delete message from Telegram to Discord on bridge ${bridge.name}: ${err.message}`
-			);
-		}
+			} catch (err: any) {
+				console.error(
+					`Could not cross-delete message from Telegram to Discord on bridge ${bridge.name}: ${err.message}`
+				);
+			}
 	};
 
 	// Function to edit a message on Discord

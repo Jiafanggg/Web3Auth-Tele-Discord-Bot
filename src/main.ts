@@ -25,6 +25,8 @@ if (!semver.gte(process.version, "16.0.0")) {
 	process.exit();
 }
 
+const { connection } = require('./db/config.js');
+
 /*************
  * TediCross *
  *************/
@@ -100,15 +102,6 @@ const messageMap = new MessageMap();
 
 
 // Create the bridge map
-
-const mysql = require("mysql2");
-
-const connection = mysql.createConnection({
-    host: "127.0.0.1",
-    user: "root",
-    password: "web3authsupport",
-    database: "TeleDiscordBot",
-});
 
 connection.connect(function (err: any) {
     if (err) throw err;
