@@ -285,7 +285,12 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log("1 record inserted");
 				});
 
-				return;
+				try {
+					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
+				}
+				catch (err) {
+					return;
+				}
 			};
 
 			if (replyToMsg) {
