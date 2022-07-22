@@ -247,6 +247,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			console.log('relay message');
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
+
 			let file = prepared.file;
 			const replyToMsg = ctx.tediCross.message.reply_to_message;
 
@@ -254,7 +255,11 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				if (err) throw err;
 			});
 
-			console.log('prepared', prepared);
+			var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255), attachmentName varchar (255), discordMessageId varchar (255) not null, preparedHeader varchar (255) not null, preparedText varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
+			connection.query(createMessageTable, function (err: any, result: any) {
+				if (err) throw err;
+				console.log("Message Table created");
+			});
 
 			const dealWithData = async function (file?: any) {
 				let chunks = R.splitEvery(2000, messageText);
@@ -268,9 +273,9 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				console.log('dctid', discordThreadId);
 
 				const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
-				console.log(discordThread);
-
 				let dcMessage = null;
+				let fileName;
+
 				// Send the attachment first, if there is one
 				if (!R.isNil(file)) {
 					try {
@@ -304,18 +309,43 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					ctx.tediCross.messageId,
 					dcMessage?.id
 				);
+
+				if (file === undefined){
+					fileName = null;
+					file = null;
+				}
+				else {
+					try {
+						fileName = prepared.file.name;
+					}
+					catch (err){
+						console.log(err);
+					}
+				}
+
+				try {
+					if (ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
+						return;
+					}
+				} catch (err){
+					console.log(err);
+				}
+
+				let dcMessages = await channel.messages.channel.messages.fetch();
+				const dcLastMessage = dcMessages?.last()?.id;
+				console.log('lastmessageid', dcLastMessage);
+
+				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName, discordMessageId, preparedHeader, preparedText) VALUES ?";
+				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, file, fileName, dcLastMessage , prepared.header, prepared.text],];
+				connection.query(insertMessageTable, [values], function (err: any, result: any) {
+					if (err) throw err;
+					console.log("1 record inserted");
+				});
 			}
 
 			if (!ctx.tediCross.message.text && replyToMsg === undefined) {
-				var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
-				connection.query(createMessageTable, function (err: any, result: any) {
-					if (err) throw err;
-					console.log("Message Table created");
-				});
-
-				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-
-				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
+				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName, discordMessageId, preparedHeader, preparedText) VALUES ?";
+				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name, "", prepared.header, prepared.text],];
 				connection.query(insertMessageTable, [values], function (err: any, result: any) {
 					if (err) throw err;
 					console.log("1 record inserted");
@@ -329,8 +359,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log('no caption');
 					return;
 				}
-
-			};
+			}
 
 			if (replyToMsg) {
 				if (replyToMsg.text) {
@@ -350,7 +379,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 			}
 			else {
-				console.log('no caption2');
 				dealWithData(file);
 			}
 
@@ -397,11 +425,6 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 		try {
 			const tgMessage = ctx.tediCross.message;
 
-			console.log('dcmessageid', ctx.TediCross.messageMap.getCorresponding(
-				MessageMap.TELEGRAM_TO_DISCORD,
-				bridge,
-				tgMessage.message_id));
-
 			// Find the ID of this message on Discord
 			const [dcMessageId] = ctx.TediCross.messageMap.getCorresponding(
 				MessageMap.TELEGRAM_TO_DISCORD,
@@ -409,12 +432,14 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 				tgMessage.message_id
 			);
 
+			console.log(dcMessageId);
+
 			// Wait for the Discord bot to become ready
 			await ctx.TediCross.dcBot.ready;
 
 			// Get the messages from Discord
 			const dcMessage = await fetchDiscordChannel(ctx.TediCross.dcBot, bridge).then(
-				channel => channel.messages.fetch(dcMessageId)
+				channel => channel.messages.channel.messages.fetch(dcMessageId)
 			);
 
 			console.log('dcMessage', dcMessage);
@@ -433,6 +458,7 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 					} as MessageEditOptions);
 				}
 			})(ctx.tediCross.prepared);
+			
 		} catch (err: any) {
 			// Log it
 			console.error(
