@@ -59,17 +59,14 @@ const createMessageHandler = R.curry((func, ctx) => {
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	let newThread = true;
-
 	//if the message is not a text & the message is about new members joining the group, do not create a new thread for it 
-	if (!ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined) {
-		newThread = false;
-	}
-	else {
-		//if the message is not an attachment or is a text message and tags the bot, stop running the function 
-		try {
-			ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
+	try {
+		if (!ctx.tediCross.message.text === undefined && ctx.tediCross.message.new_chat_members === undefined && ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){}
+	} catch (err: any) {
+		if (err.message === "Cannot read properties of undefined (reading 'includes')" && !ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined){
+			newThread = false;
 		}
-		catch {
+		else if (err.message === "Cannot read properties of undefined (reading 'includes')"){
 			try {
 				if (!ctx.tediCross.message.text.includes("@Web3Auth_SupportBot")) {
 					return;
@@ -250,6 +247,7 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
 export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
 		try {
+			console.log('relay message');
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
 			let file = prepared.file;
@@ -261,7 +259,6 @@ export const relayMessage = (ctx: TediCrossContext) =>
 
 			//Relays the message
 			const dealWithData = async function (file?: any) {
-				console.log('msg text', messageText);
 				let chunks = R.splitEvery(2000, messageText);
 
 				// Wait for the Discord bot to become ready
@@ -344,6 +341,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 			else {
 				try {
 					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
+					dealWithData(file);
 				}
 				catch (err: any) {
 					if (err.message === "Cannot read properties of undefined (reading 'includes')" && !ctx.tediCross.message.text){
