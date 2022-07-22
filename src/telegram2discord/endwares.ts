@@ -48,7 +48,7 @@ const createMessageHandler = R.curry((func, ctx) => {
  *************************/
 
 /**
- * Replies to a message with info about the chat
+ * Gets the chat info and creates a new bridge for new chats 
  *
  * @param ctx	The Telegraf context
  * @param ctx.tediCross	The TediCross object on the context
@@ -61,10 +61,12 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 	let newThread = true;
 
+	//if the message is not a text & the message is about new members joining the group, do not create a new thread for it 
 	if (!ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined) {
 		newThread = false;
 	}
 	else {
+		//if the message is not an attachment or is a text message and tags the bot, stop running the function 
 		try {
 			ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
 		}
@@ -89,11 +91,13 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 	await ctx.TediCross.dcBot.ready;
 
+	//Get all the bridges & set newChatId Boolean to false if a new bridge has not been created for the new chat 
 	for (const bridge in allBridges) {
 		if (newChatId === allBridges[bridge].telegram.chatId) {
 			newChatIdBoolean = false;
 		}
 
+		//If a new bridge has been created & a new thread has not been created before & message is not about new members joining or new messages, create a new thread for it 
 		if (allBridges[bridge].discord.threadId === '1' && newChatIdBoolean === false && newThread){
 			console.log('create new thread2');
 			let newChatThread = await dcChannel.threads.create({
@@ -101,18 +105,21 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 				autoArchiveDuration: 10080
 			});
 
+			//update the DB on the threadId
 			var updateBridgeTable = `UPDATE Bridges SET threadId = ${newChatThread.id.toString()} WHERE threadId = "1" AND bridgeName = '${allBridges[bridge].name}'`;
 			connection.query(updateBridgeTable, function (err: any, result: any) {
 				if (err) throw err;
 				console.log("1 record updated");
 			});
 
+			//update the bridge on the new threadId
 			allBridges[bridge].discord.threadId = newChatThread.id.toString();
 		}
 	}
 
+	//If the bot is added to a new chat, create the thread and the bridge 
 	if (newChatIdBoolean) {
-		console.log('create new thread1');
+		//
 		if (newThread){
 			let newChatThread = await dcChannel.threads.create({
 				name: ctx.tediCross.message.chat.title,
@@ -152,6 +159,7 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		const newBridge = new Bridge(newBridgeSettings);
 		allBridges.push(newBridge);
 
+		//update the bridge map with the new bridge 
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThreadId), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
 
@@ -159,11 +167,13 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			if (err) throw err;
 		});
 
+		//Create the table if the bridge table does not exist yet 
 		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
 		connection.query(createBridgeTable, function (err: any, result: any) {
 			if (err) throw err;
 			console.log("Table created");
 
+			//Insert the bridge into the table if it is a new bride
 			var insertBridgeTable = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
 			var values = [
 				[newBridgeSettings.name, newTelegramBridgeSettings.chatId, newTelegramBridgeSettings.sendUsernames, newTelegramBridgeSettings.relayCommands, newTelegramBridgeSettings.relayJoinMessages, newTelegramBridgeSettings.relayLeaveMessages, newTelegramBridgeSettings.crossDeleteOnDiscord, newDiscordBridgeSettings.channelId, newDiscordBridgeSettings.threadId, newDiscordBridgeSettings.threadName, newDiscordBridgeSettings.sendUsernames, newDiscordBridgeSettings.relayJoinMessages, newDiscordBridgeSettings.relayLeaveMessages, newDiscordBridgeSettings.crossDeleteOnTelegram, newBridgeSettings.direction],
@@ -255,12 +265,14 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				if (err) throw err;
 			});
 
+			//Create the message table if it does not exist 
 			var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255), attachmentName varchar (255), discordMessageId varchar (255) not null, preparedHeader varchar (255) not null, preparedText varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
 			connection.query(createMessageTable, function (err: any, result: any) {
 				if (err) throw err;
 				console.log("Message Table created");
 			});
 
+			//Relays the message
 			const dealWithData = async function (file?: any) {
 				let chunks = R.splitEvery(2000, messageText);
 
@@ -309,7 +321,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					ctx.tediCross.messageId,
 					dcMessage?.id
 				);
-
+				
+				//If file is not undefined, set the file name as the prepared file name 
 				if (file === undefined){
 					fileName = null;
 					file = null;
@@ -323,6 +336,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					}
 				}
 
+				//If the message is an attachment that tags the bot, return the function
 				try {
 					if (ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){
 						return;
@@ -331,9 +345,9 @@ export const relayMessage = (ctx: TediCrossContext) =>
 					console.log(err);
 				}
 
+				//Save the message into the table 
 				let dcMessages = await channel.messages.channel.messages.fetch();
 				const dcLastMessage = dcMessages?.last()?.id;
-				console.log('lastmessageid', dcLastMessage);
 
 				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName, discordMessageId, preparedHeader, preparedText) VALUES ?";
 				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, file, fileName, dcLastMessage , prepared.header, prepared.text],];
@@ -343,6 +357,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				});
 			}
 
+			//If the code is not a text message & if it is not a reply to message, save it to the database
 			if (!ctx.tediCross.message.text && replyToMsg === undefined) {
 				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName, discordMessageId, preparedHeader, preparedText) VALUES ?";
 				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name, "", prepared.header, prepared.text],];
@@ -361,6 +376,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 			}
 
+			//If it is a reply to message, select the original message from the DB 
 			if (replyToMsg) {
 				if (replyToMsg.text) {
 					messageText = prepared.header + "\n" + ctx.tediCross.message.reply_to_message.text;
@@ -458,7 +474,7 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 					} as MessageEditOptions);
 				}
 			})(ctx.tediCross.prepared);
-			
+
 		} catch (err: any) {
 			// Log it
 			console.error(

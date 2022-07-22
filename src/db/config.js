@@ -1,3 +1,4 @@
+//Set up connection with the database 
 const mysql = require("mysql2");
 
 exports.connection = mysql.createConnection({
