@@ -114,12 +114,18 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 			//update the bridge on the new threadId
 			allBridges[bridge].discord.threadId = newChatThread.id.toString();
+			console.log('bridge', bridge);
+
+			let discordBridge = ctx.TediCross.bridgeMap._discordToBridge;
+			let bridgeObject = discordBridge.get(1)[0];
+			discordBridge.delete(1);
+			discordBridge.set(parseInt(newChatThread.id),[bridgeObject]);
 		}
 	}
 
 	//If the bot is added to a new chat, create the thread and the bridge 
 	if (newChatIdBoolean) {
-		//
+		
 		if (newThread){
 			let newChatThread = await dcChannel.threads.create({
 				name: ctx.tediCross.message.chat.title,
@@ -162,6 +168,8 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		//update the bridge map with the new bridge 
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThreadId), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
+		console.log('new thread id', newChatThreadId);
+		console.log('discord to bridge', ctx.TediCross.bridgeMap._discordToBridge)
 
 		connection.connect(function (err: any) {
 			if (err) throw err;
@@ -267,6 +275,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				console.log(messageText);
 				let chunks = R.splitEvery(2000, messageText);
 
+				console.log('message', ctx.tediCross.message);
+
 				// Wait for the Discord bot to become ready
 				await ctx.TediCross.dcBot.ready;
 
@@ -276,7 +286,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				console.log('dctid', discordThreadId);
 
 				const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
-				console.log(discordThread);
+				console.log('discord thread', discordThread);
 
 				let dcMessage = null;
 				// Send the attachment first, if there is one
@@ -323,7 +333,7 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				});
 
 				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-
+				console.log(ctx.tediCross.message);
 				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
 				connection.query(insertMessageTable, [values], function (err: any, result: any) {
 					if (err) throw err;
@@ -407,11 +417,6 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 		try {
 			const tgMessage = ctx.tediCross.message;
 
-			console.log('dcmessageid', ctx.TediCross.messageMap.getCorresponding(
-				MessageMap.TELEGRAM_TO_DISCORD,
-				bridge,
-				tgMessage.message_id));
-
 			// Find the ID of this message on Discord
 			const [dcMessageId] = ctx.TediCross.messageMap.getCorresponding(
 				MessageMap.TELEGRAM_TO_DISCORD,
@@ -426,8 +431,6 @@ export const handleEdits = createMessageHandler(async (ctx: TediCrossContext, br
 			const dcMessage = await fetchDiscordChannel(ctx.TediCross.dcBot, bridge).then(
 				channel => channel.messages.fetch(dcMessageId)
 			);
-
-			console.log('dcMessage', dcMessage);
 
 			R.forEach(async (prepared: any) => {
 				// Discord doesn't handle messages longer than 2000 characters. Take only the first 2000

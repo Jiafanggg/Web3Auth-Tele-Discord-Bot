@@ -128,110 +128,116 @@ export function setup(
 			)
 		)(message) as string;
 
-		console.log(message.channelId);
+		console.log('dcmessage', message);
 
 		// Check if the message is from the correct chat
-		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channelId));
-
-		if (!R.isEmpty(bridges)) {
-			bridges.forEach(async bridge => {
-				// Ignore it if this is a telegram-to-discord bridge
-				if (bridge.direction === Bridge.DIRECTION_TELEGRAM_TO_DISCORD) {
-					return;
-				}
-
-				// This is now the latest message for this bridge
-				latestDiscordMessageIds.setLatest(message.id, bridge);
-
-				// Check for attachments and pass them on
-				message.attachments.forEach(async ({ url }) => {
-					try {
-						const textToSend = bridge.discord.sendUsernames
-							? `<b>${senderName} says</b>\n<a href="${url}">${url}</a>`
-							: `<a href="${url}">${url}</a>`;
-						const tgMessage = await tgBot.telegram.sendMessage(bridge.telegram.chatId, textToSend, {
-							parse_mode: "HTML"
-						});
-						messageMap.insert(
-							MessageMap.DISCORD_TO_TELEGRAM,
-							bridge,
-							message.id,
-							tgMessage.message_id.toString()
-						);
-					} catch (err) {
-						logger.error(`[${bridge.name}] Telegram did not accept an attachment:`, err);
-					}
-				});
-
-				// Check the message for embeds
-				message.embeds.forEach(embed => {
-					// Ignore it if it is not a "rich" embed (image, link, video, ...)
-					if (embed.type !== "rich") {
+		const extractBridges = async function (bridges: any[]){
+			if (!R.isEmpty(bridges)) {
+				bridges.forEach(async bridge => {
+					// Ignore it if this is a telegram-to-discord bridge
+					if (bridge.direction === Bridge.DIRECTION_TELEGRAM_TO_DISCORD) {
 						return;
 					}
-
-					// Convert it to something Telegram likes
-					const text = handleEmbed(embed, senderName);
-
-					try {
-						// Send it
-						tgBot.telegram.sendMessage(bridge.telegram.chatId, text, {
-							parse_mode: "HTML",
-							disable_web_page_preview: true
-						});
-					} catch (err) {
-						logger.error(`[${bridge.name}] Telegram did not accept an embed:`, err);
+	
+					// This is now the latest message for this bridge
+					latestDiscordMessageIds.setLatest(message.id, bridge);
+	
+					// Check for attachments and pass them on
+					message.attachments.forEach(async ({ url }) => {
+						try {
+							const textToSend = bridge.discord.sendUsernames
+								? `<b>${senderName} says</b>\n<a href="${url}">${url}</a>`
+								: `<a href="${url}">${url}</a>`;
+							const tgMessage = await tgBot.telegram.sendMessage(bridge.telegram.chatId, textToSend, {
+								parse_mode: "HTML"
+							});
+							messageMap.insert(
+								MessageMap.DISCORD_TO_TELEGRAM,
+								bridge,
+								message.id,
+								tgMessage.message_id.toString()
+							);
+						} catch (err) {
+							logger.error(`[${bridge.name}] Telegram did not accept an attachment:`, err);
+						}
+					});
+	
+					// Check the message for embeds
+					message.embeds.forEach(embed => {
+						// Ignore it if it is not a "rich" embed (image, link, video, ...)
+						if (embed.type !== "rich") {
+							return;
+						}
+	
+						// Convert it to something Telegram likes
+						const text = handleEmbed(embed, senderName);
+	
+						try {
+							// Send it
+							tgBot.telegram.sendMessage(bridge.telegram.chatId, text, {
+								parse_mode: "HTML",
+								disable_web_page_preview: true
+							});
+						} catch (err) {
+							logger.error(`[${bridge.name}] Telegram did not accept an embed:`, err);
+						}
+					});
+	
+					// Check if there is an ordinary text message
+					if (message.cleanContent) {
+						// Modify the message to fit Telegram
+						const processedMessage = md2html(message.cleanContent);
+	
+						// Pass the message on to Telegram
+						try {
+							const textToSend = bridge.discord.sendUsernames
+								? `<b>${senderName} says </b>\n${processedMessage}`
+								: processedMessage;
+							const tgMessage = await tgBot.telegram.sendMessage(bridge.telegram.chatId, textToSend, {
+								parse_mode: "HTML"
+							});
+	
+							// Make the mapping so future edits can work
+							messageMap.insert(
+								MessageMap.DISCORD_TO_TELEGRAM,
+								bridge,
+								message.id,
+								tgMessage.message_id.toString()
+							);
+						} catch (err) {
+							logger.error(`[${bridge.name}] Telegram did not accept a message:`, err);
+							logger.error(`[${bridge.name}] Failed message:`, err);
+						}
 					}
 				});
-
-				// Check if there is an ordinary text message
-				if (message.cleanContent) {
-					// Modify the message to fit Telegram
-					const processedMessage = md2html(message.cleanContent);
-
-					// Pass the message on to Telegram
-					try {
-						const textToSend = bridge.discord.sendUsernames
-							? `<b>${senderName} says </b>\n${processedMessage}`
-							: processedMessage;
-						const tgMessage = await tgBot.telegram.sendMessage(bridge.telegram.chatId, textToSend, {
-							parse_mode: "HTML"
-						});
-
-						// Make the mapping so future edits can work
-						messageMap.insert(
-							MessageMap.DISCORD_TO_TELEGRAM,
-							bridge,
-							message.id,
-							tgMessage.message_id.toString()
-						);
-					} catch (err) {
-						logger.error(`[${bridge.name}] Telegram did not accept a message:`, err);
-						logger.error(`[${bridge.name}] Failed message:`, err);
-					}
+			} else if (
+				R.isNil((message.channel as TextChannel).guild) ||
+				!knownServerIds.has((message.channel as TextChannel).guild.id)
+			) {
+				// Check if it is the correct server
+				// The message is from the wrong chat. Inform the sender that this is a private bot, if they have not been informed the last minute
+				if (!antiInfoSpamSet.has(message.channel.id)) {
+					antiInfoSpamSet.add(message.channel.id);
+					// message
+					// 	.reply(
+					// 		"This is an instance of a TediCross bot, bridging a chat in Telegram with one in Discord. " +
+					// 			"If you wish to use TediCross yourself, please download and create an instance. " +
+					// 			"See https://github.com/TediCross/TediCross"
+					// 	)
+					// 	// Delete it again after some time
+					// 	.then(sleepOneMinute)
+					// 	.then((message: any) => message.delete())
+					// 	.catch(ignoreAlreadyDeletedError)
+					// 	.then(() => antiInfoSpamSet.delete(message.channel.id));
 				}
-			});
-		} else if (
-			R.isNil((message.channel as TextChannel).guild) ||
-			!knownServerIds.has((message.channel as TextChannel).guild.id)
-		) {
-			// Check if it is the correct server
-			// The message is from the wrong chat. Inform the sender that this is a private bot, if they have not been informed the last minute
-			if (!antiInfoSpamSet.has(message.channel.id)) {
-				antiInfoSpamSet.add(message.channel.id);
-				// message
-				// 	.reply(
-				// 		"This is an instance of a TediCross bot, bridging a chat in Telegram with one in Discord. " +
-				// 			"If you wish to use TediCross yourself, please download and create an instance. " +
-				// 			"See https://github.com/TediCross/TediCross"
-				// 	)
-				// 	// Delete it again after some time
-				// 	.then(sleepOneMinute)
-				// 	.then((message: any) => message.delete())
-				// 	.catch(ignoreAlreadyDeletedError)
-				// 	.then(() => antiInfoSpamSet.delete(message.channel.id));
 			}
 		}
+
+		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channelId));
+		console.log('bridgemap', bridgeMap);
+		console.log('bridges', bridges);
+		console.log('msg', message);
+		console.log(Promise.resolve(bridges).then((bridges) => extractBridges(bridges)));
 	});
 
 	// Listen for message edits
