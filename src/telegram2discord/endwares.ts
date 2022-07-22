@@ -58,7 +58,6 @@ const createMessageHandler = R.curry((func, ctx) => {
  */
 
 export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
-
 	let newThread = true;
 
 	//if the message is not a text & the message is about new members joining the group, do not create a new thread for it 
@@ -99,7 +98,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 
 		//If a new bridge has been created & a new thread has not been created before & message is not about new members joining or new messages, create a new thread for it 
 		if (allBridges[bridge].discord.threadId === '1' && newChatIdBoolean === false && newThread){
-			console.log('create new thread2');
 			let newChatThread = await dcChannel.threads.create({
 				name: ctx.tediCross.message.chat.title,
 				autoArchiveDuration: 10080
@@ -109,12 +107,10 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			var updateBridgeTable = `UPDATE Bridges SET threadId = ${newChatThread.id.toString()} WHERE threadId = "1" AND bridgeName = '${allBridges[bridge].name}'`;
 			connection.query(updateBridgeTable, function (err: any, result: any) {
 				if (err) throw err;
-				console.log("1 record updated");
 			});
 
 			//update the bridge on the new threadId
 			allBridges[bridge].discord.threadId = newChatThread.id.toString();
-			console.log('bridge', bridge);
 
 			let discordBridge = ctx.TediCross.bridgeMap._discordToBridge;
 			let bridgeObject = discordBridge.get(1)[0];
@@ -132,7 +128,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 				autoArchiveDuration: 10080
 			});
 			newChatThreadId = newChatThread.id.toString();
-			console.log('create new thread');
 		}
 		else {
 			newChatThreadId = '1';
@@ -168,9 +163,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		//update the bridge map with the new bridge 
 		ctx.TediCross.bridgeMap._discordToBridge.set(parseInt(newChatThreadId), [newBridge]);
 		ctx.TediCross.bridgeMap._telegramToBridge.set(newChatId, [newBridge]);
-		console.log('new thread id', newChatThreadId);
-		console.log('discord to bridge', ctx.TediCross.bridgeMap._discordToBridge)
-
 		connection.connect(function (err: any) {
 			if (err) throw err;
 		});
@@ -179,7 +171,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 		var createBridgeTable = 'CREATE TABLE IF NOT EXISTS Bridges (bridgeName varchar (255) not null primary key, chatId varchar (255) unique not null, sendUsernames boolean not null, relayCommands boolean not null, relayJoinMessages boolean not null, relayLeaveMessages boolean not null, crossDeleteOnDiscord boolean not null,  channelId varchar (255) not null, threadId varchar (255) not null, threadName varchar (255) not null, dcSendUsernames boolean not null, dcRelayJoinMessages boolean not null, dcRelayLeaveMessages boolean not null, crossDeleteOnTelegram boolean not null, direction varchar (255) not null)';
 		connection.query(createBridgeTable, function (err: any, result: any) {
 			if (err) throw err;
-			console.log("Table created");
 
 			//Insert the bridge into the table if it is a new bride
 			var insertBridgeTable = "INSERT INTO Bridges (bridgeName, chatId, sendUsernames, relayCommands, relayJoinMessages, relayLeaveMessages, crossDeleteOnDiscord, channelId, threadId, threadName, dcSendUsernames, dcRelayJoinMessages, dcRelayLeaveMessages, crossDeleteOnTelegram, direction) VALUES ?";
@@ -188,7 +179,6 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 			];
 			connection.query(insertBridgeTable, [values], function (err: any, result: any) {
 				if (err) throw err;
-				console.log("1 record inserted");
 			});
 		});
 	}
@@ -260,7 +250,6 @@ export const leftChatMember = createMessageHandler((ctx: TediCrossContext, bridg
 export const relayMessage = (ctx: TediCrossContext) =>
 	R.forEach(async (prepared: any) => {
 		try {
-			console.log('relay message');
 			// Discord doesn't handle messages longer than 2000 characters. Split it up into chunks that big
 			let messageText = prepared.header + "\n" + prepared.text;
 			let file = prepared.file;
@@ -272,10 +261,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 
 			//Relays the message
 			const dealWithData = async function (file?: any) {
-				console.log(messageText);
+				console.log('msg text', messageText);
 				let chunks = R.splitEvery(2000, messageText);
-
-				console.log('message', ctx.tediCross.message);
 
 				// Wait for the Discord bot to become ready
 				await ctx.TediCross.dcBot.ready;
@@ -283,10 +270,8 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				// Get the channel to send to
 				const channel = await fetchDiscordChannel(ctx.TediCross.dcBot, prepared.bridge);
 				let discordThreadId = prepared.bridge.discord.threadId;
-				console.log('dctid', discordThreadId);
 
 				const discordThread = channel.threads.cache.find(dcThread => dcThread.id === discordThreadId);
-				console.log('discord thread', discordThread);
 
 				let dcMessage = null;
 				// Send the attachment first, if there is one
@@ -329,26 +314,13 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				var createMessageTable = 'CREATE TABLE IF NOT EXISTS Messages (messageId varchar (255) unique not null primary key, bridgeName varchar (255) not null, attachment varchar (255) not null, attachmentName varchar (255) not null, FOREIGN KEY (bridgeName) REFERENCES Bridges(bridgeName))';
 				connection.query(createMessageTable, function (err: any, result: any) {
 					if (err) throw err;
-					console.log("Message Table created");
 				});
 
 				var insertMessageTable = "insert into Messages (messageId, bridgeName, attachment, attachmentName) VALUES ?";
-				console.log(ctx.tediCross.message);
 				var values = [[ctx.tediCross.message.message_id, prepared.bridge.name, prepared.file.attachment, prepared.file.name],];
 				connection.query(insertMessageTable, [values], function (err: any, result: any) {
 					if (err) throw err;
-					console.log("1 record inserted");
 				});
-
-				// try {
-				// 	ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
-				// 	console.log('caption');
-				// }
-				// catch (err) {
-				// 	console.log('no caption');
-				// 	return;
-				// }
-
 			};
 
 			//If it is a reply to message, select the original message from the DB 
@@ -370,8 +342,15 @@ export const relayMessage = (ctx: TediCrossContext) =>
 				}
 			}
 			else {
-				console.log('no caption2');
-				dealWithData(file);
+				try {
+					ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot");
+				}
+				catch (err: any) {
+					if (err.message === "Cannot read properties of undefined (reading 'includes')" && !ctx.tediCross.message.text){
+						return;
+					}
+					dealWithData(file);
+				}
 			}
 
 		} catch (err: any) {

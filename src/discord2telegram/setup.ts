@@ -128,8 +128,6 @@ export function setup(
 			)
 		)(message) as string;
 
-		console.log('dcmessage', message);
-
 		// Check if the message is from the correct chat
 		const extractBridges = async function (bridges: any[]){
 			if (!R.isEmpty(bridges)) {
@@ -234,10 +232,7 @@ export function setup(
 		}
 
 		const bridges = bridgeMap.fromDiscordThreadId(Number(message.channelId));
-		console.log('bridgemap', bridgeMap);
-		console.log('bridges', bridges);
-		console.log('msg', message);
-		console.log(Promise.resolve(bridges).then((bridges) => extractBridges(bridges)));
+		Promise.resolve(bridges).then((bridges) => extractBridges(bridges));
 	});
 
 	// Listen for message edits
