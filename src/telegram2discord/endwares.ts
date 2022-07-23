@@ -62,7 +62,12 @@ export const chatinfo = async (ctx: TediCrossContext, next: () => void) => {
 	//if the message is not a text & the message is about new members joining the group, do not create a new thread for it 
 	try {
 		if (!ctx.tediCross.message.text === undefined && ctx.tediCross.message.new_chat_members === undefined && ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot")){}
+		console.log('not text', !ctx.tediCross.message.text === undefined)
+		console.log('not new members', ctx.tediCross.message.new_chat_members === undefined)
+		console.log('not includes w3a', ctx.tediCross.message.caption.includes("@Web3Auth_SupportBot"))
+		console.log('hit try')
 	} catch (err: any) {
+		console.log('hit catch')
 		if (err.message === "Cannot read properties of undefined (reading 'includes')" && !ctx.tediCross.message.text && ctx.tediCross.message.new_chat_members === undefined){
 			newThread = false;
 		}
