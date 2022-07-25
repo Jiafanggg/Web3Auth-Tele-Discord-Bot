@@ -1,4 +1,4 @@
-import { MessageAttachment, MessageEditOptions, Snowflake } from "discord.js";
+import { MessageAttachment, MessageEditOptions} from "discord.js";
 import R from "ramda";
 import { Context } from "telegraf";
 import { Message, User } from "telegraf/typings/core/types/typegram";
